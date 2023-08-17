@@ -1,0 +1,191 @@
+name: ci
+on:
+  workflow_dispatch:
+
+env:
+  IMAGE_TAGS: ${{ github.sha }}
+  IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
+  REGISTRY_USER: ${{ github.actor }}
+  REGISTRY_PASSWORD: ${{ github.token }}
+
+jobs:
+  build:
+    name: "build"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: setup java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '18'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: build
+        run: ./mvnw clean package -Pnative -DskipTests -Dquarkus.native.container-runtime=podman
+      - name: upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: native-sources
+          path: target/native-sources
+
+  analyze:
+    name: "run static code analysis"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: sonarqube scan
+        uses: sonarsource/sonarqube-scan-action@master
+        with:
+          projectBaseDir: src
+          args: >
+            -Dsonar.tests=test/
+            -Dsonar.verbose=true
+            -Dsonar.organization=rprakashg-redhat
+            -Dsonar.projectKey=rprakashg-redhat_scheduler
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+    needs: build
+
+  containerize:
+    name: "build container image"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: native-sources
+          path: target/native-sources  
+      - name: build image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          base-image: registry.access.redhat.com/ubi8/openjdk-11-runtime
+          image: scheduler
+          tags: ${{ env.IMAGE_TAGS }}
+          content: |
+            target/native-sources
+          cmd: ""  
+          port: 8080
+      - name: push to registry
+        id: push-to-registry
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: "scheduler"
+          tags: ${{ env.IMAGE_TAGS }}
+          registry: ${{ env.IMAGE_REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+          extra-args: |
+            --disable-content-trust
+    outputs:
+      digest: ${{ steps.push-to-registry.outputs.digest }}
+    needs: analyze
+
+  scan-image:
+    name: scan container image for vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: "Scan image"
+      uses: ./.github/actions/scan-image
+      with:
+        image: ${{ env.IMAGE_REGISTRY }}/scheduler@${{ needs.containerize.outputs.digest }}
+        central-endpoint: ${{ secrets.ROX_CENTRAL_ENDPOINT }}
+        api-token: ${{ secrets.ROX_API_TOKEN }}
+    needs: containerize
+
+  sign-image:
+    name: sign container image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: sign-image
+        uses: ./.github/actions/sign-image
+        with:
+          image: ${{ env.IMAGE_REGISTRY }}/scheduler@${{ needs.containerize.outputs.digest }}
+          registry: ${{ env.IMAGE_REGISTRY }}
+          user: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+          cosign-key: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          cosign-key-password: ${{ secrets.COSIGN_PASSWORD }}
+    outputs:
+      digest: ${{ needs.containerize.outputs.digest }}
+    needs: containerize
+
+  check-image:
+    name: check image
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: "Check image"
+      uses: ./.github/actions/check-image
+      with:
+        image: ${{ env.IMAGE_REGISTRY }}/scheduler@${{ needs.sign-image.outputs.digest }}
+        central-endpoint: ${{ secrets.ROX_CENTRAL_ENDPOINT }}
+        api-token: ${{ secrets.ROX_API_TOKEN }}
+    outputs:
+      digest: ${{ needs.sign-image.outputs.digest }}
+    needs: sign-image
+
+  update-deployment-manifests:
+    name: update deployment artifacts
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+      with:
+        repository: rprakashg-redhat/scheduler-ops
+        ref: refs/heads/main
+        token: ${{ secrets.GH_TOKEN }}
+    - name: setup git
+      run: |
+        # Setting up the git config.
+        git config --global user.email "rgopinat@redhat.com" # HARD CODING FOR NOW, NEED TO DETERMINE HOW TO RETRIEVE THIS FROM CURRENT USER CONTEXT
+        git config --global user.name ${{ github.actor }}
+    - name: update manifest
+      run: |
+        IMAGE=\"${{ env.IMAGE_REGISTRY }}/scheduler@${{ needs.check-image.outputs.digest }}\"
+        git checkout -b "${{ github.job }}-${{ github.sha }}"
+        sed -i "s#\(.*value:\s*\).*#\1 ${IMAGE}#" apps/service/overlays/dev/kustomization.yaml
+        cat apps/service/overlays/dev/kustomization.yaml
+
+        git add .
+        git commit -m "updated manifest to point to image tag $IMAGE"
+        git push origin "${{ github.job }}-${{ github.sha }}"
+    needs: check-image
+
+  #open-pr:
+  #  name: Open pull request
+  #  runs-on: ubuntu-latest
+  #  steps:
+  #  - uses: actions/checkout@master
+  #    with:
+  #      repository: rprakashg-redhat/scheduler-ops
+  #      ref: refs/heads/main
+  #      token: ${{ secrets.GH_TOKEN }}
+  #  - name: setup git
+  #    run: |
+  #      # Setting up the git config.
+  #      git config --global user.email "rgopinat@redhat.com" # HARD CODING FOR NOW, NEED TO DETERMINE HOW TO RETRIEVE THIS FROM CURRENT USER CONTEXT
+  #      git config --global user.name ${{ github.actor }}
+  #  - name: open PR
+  #    id: opr
+  #    uses: peter-evans/create-pull-request@v5
+  #    with:
+  #      token: ${{ secrets.GH_TOKEN }}
+  #      commit-message: "Opening PR for commit - ${{ github.sha }}"
+  #      title: "Deployment PR for commit - ${{ github.sha }}"
+  #      body: |
+  #        Deployment PR for commit - ${{ github.sha }} made by ${{ github.actor }}
+  #      branch: update-deployment-manifests-${{ github.sha }}
+  #      base: main
+  #  - name: check outputs
+  #    if: ${{ steps.opr.outputs.pull-request-number }}
+  #    run: |
+  #      echo "Pull Request Number - ${{ steps.opr.outputs.pull-request-number }}"
+  #      echo "Pull Request URL - ${{ steps.opr.outputs.pull-request-url }}"
+  #  - name: notify-devops
+  #    if: ${{ steps.opr.outputs.pull-request-number }}
+  #    run: |
+  #      echo "Sending notification to devops to approve and merge PR"
+  #  needs: update-deployment-manifests

@@ -1,0 +1,31 @@
+name: image-check
+description: 'Check image with StackRox'
+inputs:
+  central-endpoint:
+    description: 'Central endpoint in the format stackrox.contoso.com:443'
+    required: true
+  api-token:
+    description: 'API token with CI permissions'
+    required: true
+  image:
+    description: 'Full name of the image to scan -- gcr.io/stackrox/testimage:5.1'
+    required: true
+  skip-tls-verify:
+    description: 'Skip TLS certificate validation'
+    required: false
+    default: 'false'
+runs:
+  using: "composite"
+  steps:
+    - run: >
+        curl -s -k -L -H "Authorization: Bearer ${{ inputs.api-token }}" https://${{ inputs.central-endpoint }}:443/api/cli/download/roxctl-linux --output ./roxctl
+      shell: bash
+    - run: chmod +x ./roxctl
+      shell: bash
+    - id: scan-check
+      run: |
+        ./roxctl image check --force -e https://${{ inputs.central-endpoint }}:443 --image ${{ inputs.image }}
+      env:
+        ROX_API_TOKEN: ${{ inputs.api-token }}
+        ROX_INSECURE_CLIENT_SKIP_TLS_VERIFY: ${{ inputs.skip-tls-verify }}
+      shell: bash

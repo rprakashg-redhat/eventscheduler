@@ -1,0 +1,57 @@
+name: sign-image
+description: sign a container image using cosign private key
+inputs:
+  image:
+    description: container image to sign
+    required: true
+  sbom:
+    description: sbom artifact name
+    required: true
+  registry:
+    description: container registry
+    required: true
+  user:
+    description: credential to login to registry
+    required: true
+  password:
+    description: password to login to registry
+    required: true
+  cosign-key:
+    description: cosign private key
+    required: true
+  cosign-key-password:
+    description: cosign private key password
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: login to registry
+      uses: redhat-actions/podman-login@v1
+      with:
+        username: ${{ inputs.user }}
+        password: ${{ inputs.password }}
+        registry: ${{ inputs.registry }} 
+    - name: install cosign
+      uses: sigstore/cosign-installer@v3.1.1
+    - name: check install
+      run: cosign version
+      shell: bash
+    - name: generate sbom
+      uses: anchore/sbom-action@v0
+      with:
+        image: ${{ inputs.image }}
+        output-file: /tmp/sbom.spdx
+    - name: Sign image with a key
+      run: |
+        cosign sign --yes --key env://COSIGN_PRIVATE_KEY "${{ inputs.image }}"
+      shell: bash
+      env:
+        COSIGN_PRIVATE_KEY: ${{ inputs.cosign-key }}
+        COSIGN_PASSWORD: ${{ inputs.cosign-key-password }}
+    - name: sbom attestation
+      run: cosign attest --predicate="/tmp/sbom.spdx" --type=spdxjson --key env://COSIGN_PRIVATE_KEY -y "${{ inputs.image }}"
+      shell: bash
+      env:
+        COSIGN_PRIVATE_KEY: ${{ inputs.cosign-key }}
+        COSIGN_PASSWORD: ${{ inputs.cosign-key-password }}
