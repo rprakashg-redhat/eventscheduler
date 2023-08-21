@@ -132,7 +132,7 @@ jobs:
     name: update deployment artifacts
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v3
       with:
         repository: rprakashg-redhat/scheduler-ops
         ref: refs/heads/main
@@ -158,7 +158,7 @@ jobs:
     name: Open pull request
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v3
       with:
         repository: rprakashg-redhat/scheduler-ops
         ref: refs/heads/main
@@ -174,7 +174,7 @@ jobs:
         gh pr create --body "PR for commit - ${{ github.sha }} by ${{ github.actor }}" \ 
             --title "PR for commit - ${{ github.sha }}"  \
             --base main \
-            --head "${{ github.job }}-${{ github.sha }}"
+            --head "update-deployment-manifests-${{ github.sha }}"
       env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
     - name: notify-devops
