@@ -25,8 +25,8 @@ jobs:
       - name: upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: native-sources
-          path: target/native-sources
+          name: native-executable
+          path: target/eventscheduler-1.0.0-SNAPSHOT-native-image-source-jar/eventscheduler-1.0.0-SNAPSHOT-runner.jar
 
   analyze:
     name: "run static code analysis"
@@ -41,7 +41,7 @@ jobs:
             -Dsonar.tests=test/
             -Dsonar.verbose=true
             -Dsonar.organization=rprakashg-redhat
-            -Dsonar.projectKey=rprakashg-redhat_scheduler
+            -Dsonar.projectKey=rprakashg-redhat_eventscheduler
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -55,17 +55,16 @@ jobs:
       - name: download artifact
         uses: actions/download-artifact@v3
         with:
-          name: native-sources
-          path: target/native-sources  
+          name: native-executable
+          path: target/eventscheduler-1.0.0-SNAPSHOT-native-image-source-jar/
       - name: build image
         uses: redhat-actions/buildah-build@v2
         with:
           base-image: registry.access.redhat.com/ubi8/openjdk-11-runtime
-          image: scheduler
+          image: eventscheduler
           tags: ${{ env.IMAGE_TAGS }}
           content: |
-            target/native-sources
-          cmd: ""  
+            target/eventscheduler-1.0.0-SNAPSHOT-native-image-source-jar/eventscheduler-1.0.0-SNAPSHOT-runner.jar
           port: 8080
       - name: push to registry
         id: push-to-registry
@@ -90,7 +89,7 @@ jobs:
     - name: "Scan image"
       uses: ./.github/actions/scan-image
       with:
-        image: ${{ env.IMAGE_REGISTRY }}/scheduler@${{ needs.containerize.outputs.digest }}
+        image: ${{ env.IMAGE_REGISTRY }}/eventscheduler@${{ needs.containerize.outputs.digest }}
         central-endpoint: ${{ secrets.ROX_CENTRAL_ENDPOINT }}
         api-token: ${{ secrets.ROX_API_TOKEN }}
     needs: containerize
@@ -103,7 +102,7 @@ jobs:
       - name: sign-image
         uses: ./.github/actions/sign-image
         with:
-          image: ${{ env.IMAGE_REGISTRY }}/scheduler@${{ needs.containerize.outputs.digest }}
+          image: ${{ env.IMAGE_REGISTRY }}/eventscheduler@${{ needs.containerize.outputs.digest }}
           registry: ${{ env.IMAGE_REGISTRY }}
           user: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
@@ -121,7 +120,7 @@ jobs:
     - name: "Check image"
       uses: ./.github/actions/check-image
       with:
-        image: ${{ env.IMAGE_REGISTRY }}/scheduler@${{ needs.sign-image.outputs.digest }}
+        image: ${{ env.IMAGE_REGISTRY }}/eventscheduler@${{ needs.sign-image.outputs.digest }}
         central-endpoint: ${{ secrets.ROX_CENTRAL_ENDPOINT }}
         api-token: ${{ secrets.ROX_API_TOKEN }}
     outputs:
@@ -144,7 +143,7 @@ jobs:
         git config --global user.name ${{ github.actor }}
     - name: update manifest
       run: |
-        IMAGE=\"${{ env.IMAGE_REGISTRY }}/scheduler@${{ needs.check-image.outputs.digest }}\"
+        IMAGE=\"${{ env.IMAGE_REGISTRY }}/eventscheduler@${{ needs.check-image.outputs.digest }}\"
         git checkout -b "${{ github.job }}-${{ github.sha }}"
         sed -i "s#\(.*value:\s*\).*#\1 ${IMAGE}#" apps/service/overlays/dev/kustomization.yaml
         cat apps/service/overlays/dev/kustomization.yaml
