@@ -14,12 +14,21 @@ import java.util.UUID;
 @NoArgsConstructor
 @Table(name = "speakers")
 @Entity
+@NamedQueries({
+        @NamedQuery(
+            name = "Speaker.findByEvent",
+            query = "SELECT Speaker.id, Speaker.name, Speaker.title, Speaker.email, Speaker.company, " +
+                        "Speaker.linkedIn, Speaker.twitter " +
+                    "FROM Speaker, Session, Event WHERE Event.id = :eventId AND Session.event = Event.id " +
+                    "AND Session.speaker = Speaker.id"
+        )
+})
 public class Speaker extends PanacheEntityBase {
     @Id
     @GeneratedValue(generator = "UUID")
     @GenericGenerator(
             name = "UUID",
-            strategy = "org.hibernate.id.UUIDGenerator"
+            type = org.hibernate.id.uuid.UuidGenerator.class
     )
     @Column(name = "speaker_id", updatable = false, nullable = false)
     @Getter

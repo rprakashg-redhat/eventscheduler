@@ -28,15 +28,7 @@ public class SpeakerResource {
 
     @GET
     public Uni<List<Speaker>> getSpeakers(@QueryParam("eventId") UUID eventId) {
-        return Panache
-                .withTransaction(() -> Session.<Session> find("event", eventId).list()
-                        .map(sessions -> {
-
-                        })
-
-
-                )
-
+        return Speaker.find("#Speaker.findByEvent", eventId).list();
     }
 
     @GET
