@@ -41,7 +41,7 @@ jobs:
             -Dsonar.tests=test/
             -Dsonar.verbose=true
             -Dsonar.organization=rprakashg-redhat
-            -Dsonar.projectKey=rprakashg-redhat_eventscheduler
+            -Dsonar.projectKey=eventscheduler
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -65,6 +65,7 @@ jobs:
           tags: ${{ env.IMAGE_TAGS }}
           content: |
             target/eventscheduler-1.0.0-SNAPSHOT-native-image-source-jar/eventscheduler-1.0.0-SNAPSHOT-runner.jar
+          entrypoint: java -jar eventscheduler-1.0.0-SNAPSHOT-runner.jar
           port: 8080
       - name: push to registry
         id: push-to-registry
