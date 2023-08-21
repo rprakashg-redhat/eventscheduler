@@ -71,7 +71,7 @@ jobs:
         id: push-to-registry
         uses: redhat-actions/push-to-registry@v2
         with:
-          image: "eventscheduler"
+          image: eventscheduler
           tags: ${{ env.IMAGE_TAGS }}
           registry: ${{ env.IMAGE_REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -154,38 +154,30 @@ jobs:
         git push origin "${{ github.job }}-${{ github.sha }}"
     needs: check-image
 
-  #open-pr:
-  #  name: Open pull request
-  #  runs-on: ubuntu-latest
-  #  steps:
-  #  - uses: actions/checkout@master
-  #    with:
-  #      repository: rprakashg-redhat/scheduler-ops
-  #      ref: refs/heads/main
-  #      token: ${{ secrets.GH_TOKEN }}
-  #  - name: setup git
-  #    run: |
-  #      # Setting up the git config.
-  #      git config --global user.email "rgopinat@redhat.com" # HARD CODING FOR NOW, NEED TO DETERMINE HOW TO RETRIEVE THIS FROM CURRENT USER CONTEXT
-  #      git config --global user.name ${{ github.actor }}
-  #  - name: open PR
-  #    id: opr
-  #    uses: peter-evans/create-pull-request@v5
-  #    with:
-  #      token: ${{ secrets.GH_TOKEN }}
-  #      commit-message: "Opening PR for commit - ${{ github.sha }}"
-  #      title: "Deployment PR for commit - ${{ github.sha }}"
-  #      body: |
-  #        Deployment PR for commit - ${{ github.sha }} made by ${{ github.actor }}
-  #      branch: update-deployment-manifests-${{ github.sha }}
-  #      base: main
-  #  - name: check outputs
-  #    if: ${{ steps.opr.outputs.pull-request-number }}
-  #    run: |
-  #      echo "Pull Request Number - ${{ steps.opr.outputs.pull-request-number }}"
-  #      echo "Pull Request URL - ${{ steps.opr.outputs.pull-request-url }}"
-  #  - name: notify-devops
-  #    if: ${{ steps.opr.outputs.pull-request-number }}
-  #    run: |
-  #      echo "Sending notification to devops to approve and merge PR"
-  #  needs: update-deployment-manifests
+  open-pr:
+    name: Open pull request
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+      with:
+        repository: rprakashg-redhat/scheduler-ops
+        ref: refs/heads/main
+        token: ${{ secrets.GH_TOKEN }}
+    - name: setup git
+      run: |
+        # Setting up the git config.
+        git config --global user.email "rgopinat@redhat.com" # HARD CODING FOR NOW, NEED TO DETERMINE HOW TO RETRIEVE THIS FROM CURRENT USER CONTEXT
+        git config --global user.name ${{ github.actor }}
+    - name: open PR
+      id: opr
+      run: |
+        gh pr create --body "PR for commit - ${{ github.sha }} by ${{ github.actor }}" \ 
+            --title "PR for commit - ${{ github.sha }}"  \
+            --base main \
+            --head "${{ github.job }}-${{ github.sha }}"
+      env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+    - name: notify-devops
+      run: |
+        echo "Sending notification to devops to approve and merge PR"
+    needs: update-deployment-manifests

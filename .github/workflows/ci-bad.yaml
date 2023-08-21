@@ -9,25 +9,6 @@ env:
   REGISTRY_PASSWORD: ${{ github.token }}
 
 jobs:
-  build:
-    name: "build"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: setup java
-        uses: actions/setup-java@v3
-        with:
-          java-version: '18'
-          distribution: 'temurin'
-          cache: 'maven'
-      - name: build
-        run: ./mvnw -B clean package
-      - name: upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: scheduler-1.0.0-SNAPSHOT.jar
-          path: target/scheduler-1.0.0-SNAPSHOT.jar
-
   containerize:
     name: "build container image"
     runs-on: ubuntu-latest
@@ -37,23 +18,23 @@ jobs:
       - name: download artifact
         uses: actions/download-artifact@v3
         with:
-          name: scheduler-1.0.0-SNAPSHOT.jar
-          path: target/scheduler-1.0.0-SNAPSHOT.jar  
+          name: native-executable
+          path: target/eventscheduler-1.0.0-SNAPSHOT-native-image-source-jar/
       - name: build image
         uses: redhat-actions/buildah-build@v2
         with:
           base-image: registry.access.redhat.com/ubi8/openjdk-11-runtime
-          image: scheduler
+          image: eventscheduler-unsigned
           tags: ${{ env.IMAGE_TAGS }}
           content: |
-            target/scheduler-1.0.0-SNAPSHOT.jar
+            target/eventscheduler-1.0.0-SNAPSHOT-native-image-source-jar/eventscheduler-1.0.0-SNAPSHOT-runner.jar
           entrypoint: java -jar scheduler-1.0.0-SNAPSHOT.jar
           port: 8080
       - name: push to registry
         id: push-to-registry
         uses: redhat-actions/push-to-registry@v2
         with:
-          image: "scheduler-unsigned"
+          image: eventscheduler-unsecured
           tags: ${{ env.IMAGE_TAGS }}
           registry: ${{ env.IMAGE_REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -72,23 +53,10 @@ jobs:
     - name: "Check image"
       uses: ./.github/actions/check-image
       with:
-        image: ${{ env.IMAGE_REGISTRY }}/scheduler-unsigned@${{ needs.containerize.outputs.digest }}
+        image: ${{ env.IMAGE_REGISTRY }}/eventscheduler-unsecured@${{ needs.containerize.outputs.digest }}
         central-endpoint: ${{ secrets.ROX_CENTRAL_ENDPOINT }}
         api-token: ${{ secrets.ROX_API_TOKEN }}
     needs: containerize
 
-  scan-image:
-    name: scan image
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: "Scan image"
-      uses: ./.github/actions/scan-image
-      with:
-        image: ${{ env.IMAGE_REGISTRY }}/scheduler-unsigned@${{ needs.containerize.outputs.digest }}
-        central-endpoint: ${{ secrets.ROX_CENTRAL_ENDPOINT }}
-        api-token: ${{ secrets.ROX_API_TOKEN }}
-    needs: containerize
-
-#  update-deployment-artifacts:
+  update-deployment-artifacts:
 
