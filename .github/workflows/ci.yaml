@@ -21,7 +21,7 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       - name: build
-        run: ./mvnw install
+        run: ./mvnw clean install
       - name: upload artifact
         uses: actions/upload-artifact@v3
         with:

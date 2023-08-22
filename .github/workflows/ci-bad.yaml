@@ -21,12 +21,12 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       - name: build
-        run: ./mvnw clean package -Pnative -DskipTests -Dquarkus.native.container-runtime=podman
+        run: ./mvnw clean install
       - name: upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: native-executable
-          path: target/eventscheduler-1.0.0-SNAPSHOT-native-image-source-jar/eventscheduler-1.0.0-SNAPSHOT-runner.jar
+          name: quarkus-app
+          path: target/quarkus-app/
 
   containerize:
     name: "build container image"
@@ -37,8 +37,8 @@ jobs:
       - name: download artifact
         uses: actions/download-artifact@v3
         with:
-          name: native-executable
-          path: target/eventscheduler-1.0.0-SNAPSHOT-native-image-source-jar/
+          name: quarkus-app
+          path: target/quarkus-app/
       - name: build image
         uses: redhat-actions/buildah-build@v2
         with:
@@ -46,8 +46,8 @@ jobs:
           image: eventscheduler-unsecured
           tags: ${{ env.IMAGE_TAGS }}
           content: |
-            target/eventscheduler-1.0.0-SNAPSHOT-native-image-source-jar/eventscheduler-1.0.0-SNAPSHOT-runner.jar
-          entrypoint: java -jar scheduler-1.0.0-SNAPSHOT.jar
+            target/quarkus-app/
+          entrypoint: java -jar ./quarkus-app/quarkus-run.jar
           port: 8080
       - name: push to registry
         id: push-to-registry
