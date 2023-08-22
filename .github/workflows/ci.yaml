@@ -168,4 +168,5 @@ jobs:
         body: "PR for commit - ${{ github.sha }} by ${{ github.actor }}"
         base: main
         head: "update-deployment-manifests-${{ github.sha }}"
+    - uses: actions/checkout@v3
     needs: update-deployment-manifests
