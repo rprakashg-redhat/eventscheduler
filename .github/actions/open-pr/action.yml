@@ -36,7 +36,7 @@ runs:
   - name: open PR
     id: opr
     run: |
-      gh pr create --body ${{ inputs.body }} --title ${{ inputs.title }} --base ${{ inputs.base }} --head ${{ inputs.head }}
+      gh pr create --body "${{ inputs.body }}" --title "${{ inputs.title }}" --base ${{ inputs.base }} --head "${{ inputs.head }}"
     env:
       GITHUB_TOKEN: ${{ inputs.token }}
     shell: bash
