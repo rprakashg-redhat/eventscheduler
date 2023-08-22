@@ -1,0 +1,46 @@
+name: open-pr
+description: opens a pull request in specified repo
+inputs:
+  token:
+    description: Fine grained github personal access token
+    required: true
+  repo:
+    description: Repository where the pull request needs to be opened
+    required: true
+  title:
+    description: Title for the pull request to be opened
+    required: true
+  body:
+    description: Body for the pull request to be opened
+    required: true
+  base:
+    description: branch to which you want the changes to be merged
+    required: true
+  head:
+    description: branch that contains changes
+    required: true
+runs:
+  using: "composite"
+  steps:
+  - uses: actions/checkout@v3
+    with:
+      repository: ${{ inputs.repo }}
+      ref: refs/heads/main
+      token: ${{ inputs.token }}
+  - name: setup git
+    run: |
+      # Setting up the git config.
+      git config --global user.email "rgopinat@redhat.com" # HARD CODING FOR NOW, NEED TO DETERMINE HOW TO RETRIEVE THIS FROM CURRENT USER CONTEXT
+      git config --global user.name ${{ github.actor }}
+    shell: bash
+  - name: open PR
+    id: opr
+    run: |
+      gh pr create --body ${{ inputs.body }} --title ${{ inputs.title }} --base ${{ inputs.base }} --head ${{ inputs.head }}
+    env:
+      GITHUB_TOKEN: ${{ inputs.token }}
+    shell: bash
+  - name: notify
+    run: |
+      echo "Sending notification to devops to approve and merge PR"
+    shell: bash

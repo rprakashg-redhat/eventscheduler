@@ -9,6 +9,25 @@ env:
   REGISTRY_PASSWORD: ${{ github.token }}
 
 jobs:
+  build:
+    name: "build"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: setup java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '18'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: build
+        run: ./mvnw clean package -Pnative -DskipTests -Dquarkus.native.container-runtime=podman
+      - name: upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: native-executable
+          path: target/eventscheduler-1.0.0-SNAPSHOT-native-image-source-jar/eventscheduler-1.0.0-SNAPSHOT-runner.jar
+
   containerize:
     name: "build container image"
     runs-on: ubuntu-latest
@@ -24,7 +43,7 @@ jobs:
         uses: redhat-actions/buildah-build@v2
         with:
           base-image: registry.access.redhat.com/ubi8/openjdk-11-runtime
-          image: eventscheduler-unsigned
+          image: eventscheduler-unsecured
           tags: ${{ env.IMAGE_TAGS }}
           content: |
             target/eventscheduler-1.0.0-SNAPSHOT-native-image-source-jar/eventscheduler-1.0.0-SNAPSHOT-runner.jar
@@ -57,6 +76,46 @@ jobs:
         central-endpoint: ${{ secrets.ROX_CENTRAL_ENDPOINT }}
         api-token: ${{ secrets.ROX_API_TOKEN }}
     needs: containerize
+    continue-on-error: true
 
-  #update-deployment-artifacts:
+  update-deployment-manifests:
+    name: update deployment artifacts
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        repository: rprakashg-redhat/scheduler-ops
+        ref: refs/heads/main
+        token: ${{ secrets.GH_TOKEN }}
+    - name: setup git
+      run: |
+        # Setting up the git config.
+        git config --global user.email "rgopinat@redhat.com" # HARD CODING FOR NOW, NEED TO DETERMINE HOW TO RETRIEVE THIS FROM CURRENT USER CONTEXT
+        git config --global user.name ${{ github.actor }}
+    - name: update manifest
+      run: |
+        IMAGE=\"${{ env.IMAGE_REGISTRY }}/eventscheduler-unsecured@${{ needs.containerize.outputs.digest }}\"
+        git checkout -b "${{ github.job }}-${{ github.sha }}"
+        sed -i "s#\(.*value:\s*\).*#\1 ${IMAGE}#" apps/service/overlays/dev/kustomization.yaml
+        cat apps/service/overlays/dev/kustomization.yaml
 
+        git add .
+        git commit -m "updated manifest to point to image tag $IMAGE"
+        git push origin "${{ github.job }}-${{ github.sha }}"        
+    needs: containerize
+
+  open-pr:
+    name: Open pull request
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: open pr
+      uses: ./.github/actions/open-pr
+      with:
+        repo: rprakashg-redhat/scheduler-ops
+        token: ${{ secrets.GH_TOKEN }}
+        title: "PR for commit - ${{ github.sha }}"
+        body: "PR for commit - ${{ github.sha }} by ${{ github.actor }}"
+        base: main
+        head: "update-deployment-manifests-${{ github.sha }}"
+    needs: update-deployment-manifests
