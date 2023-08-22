@@ -58,5 +58,5 @@ jobs:
         api-token: ${{ secrets.ROX_API_TOKEN }}
     needs: containerize
 
-  update-deployment-artifacts:
+  #update-deployment-artifacts:
 

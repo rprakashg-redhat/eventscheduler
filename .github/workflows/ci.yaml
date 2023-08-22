@@ -171,10 +171,7 @@ jobs:
     - name: open PR
       id: opr
       run: |
-        gh pr create --body "PR for commit - ${{ github.sha }} by ${{ github.actor }}" \ 
-            --title "PR for commit - ${{ github.sha }}"  \
-            --base main \
-            --head "update-deployment-manifests-${{ github.sha }}"
+        gh pr create --body "PR for commit - ${{ github.sha }} by ${{ github.actor }}" --title "PR for commit - ${{ github.sha }}" --base main --head "update-deployment-manifests-${{ github.sha }}"
       env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
     - name: notify-devops
