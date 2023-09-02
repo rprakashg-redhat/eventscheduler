@@ -66,6 +66,7 @@ jobs:
           content: |
             target/quarkus-app/
           entrypoint: java -jar quarkus-run.jar
+          workdir: /home/jboss
           port: 8080
       - name: push to registry
         id: push-to-registry
