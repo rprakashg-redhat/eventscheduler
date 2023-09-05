@@ -60,13 +60,10 @@ jobs:
       - name: build image
         uses: redhat-actions/buildah-build@v2
         with:
-          base-image: registry.access.redhat.com/ubi8/openjdk-11-runtime
           image: eventscheduler
           tags: ${{ env.IMAGE_TAGS }}
-          content: |
-            target/quarkus-app/
-          entrypoint: "java -jar quarkus-run.jar"
-          port: 8080
+          containerfiles: |
+            ./docker/Dockerfile .
       - name: push to registry
         id: push-to-registry
         uses: redhat-actions/push-to-registry@v2
