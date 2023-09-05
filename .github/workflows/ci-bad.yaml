@@ -42,7 +42,7 @@ jobs:
       - name: build image
         uses: redhat-actions/buildah-build@v2
         with:
-          image: eventscheduler
+          image: eventscheduler-unsecured
           tags: ${{ env.IMAGE_TAGS }}
           containerfiles: |
             ./docker/Dockerfile
