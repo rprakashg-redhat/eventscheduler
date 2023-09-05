@@ -63,7 +63,7 @@ jobs:
           image: eventscheduler
           tags: ${{ env.IMAGE_TAGS }}
           containerfiles: |
-            ./docker/Dockerfile .
+            ./docker/Dockerfile
       - name: push to registry
         id: push-to-registry
         uses: redhat-actions/push-to-registry@v2
