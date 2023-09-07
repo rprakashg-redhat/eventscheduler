@@ -17,17 +17,20 @@ import java.util.UUID;
 @NamedQueries({
         @NamedQuery(
             name = "Speaker.findByEvent",
-            query = "SELECT Speaker.id, Speaker.name, Speaker.title, Speaker.email, Speaker.company, " +
-                        "Speaker.linkedIn, Speaker.twitter " +
-                    "FROM Speaker, Session, Event WHERE Event.id = :eventId AND Session.event = Event.id " +
-                    "AND Session.speaker = Speaker.id"
+            query = "SELECT DISTINCT s " +
+                    "FROM Speaker s "  +
+                    "JOIN Session se " +
+                    "JOIN Event e " +
+                    "WHERE s.id = Se.speaker " +
+                    "AND se.event = e.id " +
+                    "AND e.id = :eventId"
         )
 })
 public class Speaker extends PanacheEntityBase {
     @Id
     @GeneratedValue(generator = "UUID")
     @GenericGenerator(
-            name = "UUID",
+            name = "uuid2",
             type = org.hibernate.id.uuid.UuidGenerator.class
     )
     @Column(name = "speaker_id", updatable = false, nullable = false)

@@ -25,7 +25,7 @@ public class Event extends PanacheEntityBase {
     @Id
     @GeneratedValue(generator = "UUID")
     @GenericGenerator(
-            name = "UUID",
+            name = "uuid2",
             type = org.hibernate.id.uuid.UuidGenerator.class
     )
     @Column(name = "event_id", updatable = false, nullable = false)

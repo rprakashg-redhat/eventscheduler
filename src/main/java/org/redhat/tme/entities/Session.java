@@ -19,7 +19,7 @@ public class Session extends PanacheEntityBase {
     @Id
     @GeneratedValue(generator = "UUID")
     @GenericGenerator(
-            name = "UUID",
+            name = "uuid2",
             type = org.hibernate.id.uuid.UuidGenerator.class
     )
     @Column(name = "session_id", updatable = false, nullable = false)
