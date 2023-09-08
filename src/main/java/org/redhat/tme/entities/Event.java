@@ -1,11 +1,11 @@
 package org.redhat.tme.entities;
 
+import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.Type;
 import org.redhat.tme.enums.EventType;
-import org.redhat.tme.utils.PostgreSqlStringArrayType;
 
 
 import jakarta.persistence.*;
@@ -13,7 +13,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
+import org.redhat.tme.utils.PostgreSqlStringArrayType;
 
 import java.util.UUID;
 
@@ -54,15 +54,15 @@ public class Event extends PanacheEntityBase {
     @Setter
     private String location;
 
-    @Column(columnDefinition = "text[]")
+    @Column(name = "audiences", columnDefinition = "text[]")
     @Getter
     @Setter
     @Type(value = PostgreSqlStringArrayType.class)
-    private String[] audience;
+    private String[] audiences;
 
-    @Column(columnDefinition = "text[]")
+    @Column(name = "topics", columnDefinition = "text[]")
+    @Type(value = PostgreSqlStringArrayType.class)
     @Getter
     @Setter
-    @Type(value = PostgreSqlStringArrayType.class)
     private String[] topics;
 }

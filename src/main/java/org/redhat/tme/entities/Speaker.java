@@ -21,7 +21,7 @@ import java.util.UUID;
                     "FROM Speaker s "  +
                     "JOIN Session se " +
                     "JOIN Event e " +
-                    "WHERE s.id = Se.speaker " +
+                    "WHERE s.id = se.speaker " +
                     "AND se.event = e.id " +
                     "AND e.id = :eventId"
         )
