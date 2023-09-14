@@ -93,7 +93,7 @@ jobs:
       run: |
         IMAGE=\"${{ env.IMAGE_REGISTRY }}/eventscheduler-unsecured@${{ needs.containerize.outputs.digest }}\"
         git checkout -b "${{ github.job }}-${{ github.sha }}"
-        sed -i "s#\(.*value:\s*\).*#\1 ${IMAGE}#" applications/eventscheduler/service/overlays/dev/kustomization.yaml
+        sed -i "s#\(.*value:\s*\).*#\1 ${IMAGE}#" applications/eventscheduler/overlays/dev/kustomization.yaml
         cat apps/service/overlays/dev/kustomization.yaml
 
         git add .
