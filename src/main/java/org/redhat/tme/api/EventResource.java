@@ -2,12 +2,9 @@ package org.redhat.tme.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.quarkus.hibernate.reactive.panache.Panache;
-import io.quarkus.panache.common.Sort;
 import io.smallrye.mutiny.CompositeException;
-import io.smallrye.mutiny.Uni;
-
 import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -15,8 +12,10 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 import org.jboss.logging.Logger;
 import org.redhat.tme.entities.Event;
+import org.redhat.tme.services.EventsService;
 
-import java.util.List;
+import java.net.URI;
+import java.util.Set;
 import java.util.UUID;
 
 
@@ -27,44 +26,47 @@ import java.util.UUID;
 public class EventResource {
     private static final Logger LOGGER = Logger.getLogger(EventResource.class.getName());
 
+    @Inject
+    EventsService service;
+
     @GET
-    public Uni<List<Event>> getAll() {
-        return Event.listAll(Sort.by("name"));
+    public Response getAll() {
+        Set<Event> events = service.getAllEvents();
+
+        return Response.ok(events)
+                .status(Response.Status.OK)
+                .build();
     }
 
     @GET
     @Path("{id}")
-    public Uni<Event> getById(UUID id) {
-        return Event.findById(id);
+    public Response getById(UUID id) {
+        Event event = service.getEventById(id);
+
+        return Response.ok(event)
+                .status(Response.Status.OK)
+                .build();
     }
 
     @POST
-    public Uni<Response> create(Event newEvent) {
-        if (newEvent == null )
-            throw new WebApplicationException("Event payload is required");
-        return Panache
-                .withTransaction(newEvent::persist)
-                .replaceWith(Response.ok(newEvent).status(Response.Status.CREATED)::build);
+    @Transactional
+    public Response create(Event newEvent) {
+        Event event = service.updateOrInsert(newEvent);
+
+        return Response.created(URI.create("/events/" + event.getId()))
+                .status(Response.Status.CREATED)
+                .build();
     }
 
     @PUT
     @Path("{id}")
-    public Uni<Response> update(UUID id, Event event) {
-        if (event == null)
-                throw new WebApplicationException("Event payload is required to update");
-        return Panache
-                .withTransaction(() -> Event.<Event> findById(id)
-                .onItem().ifNotNull().transform(entity -> Response.ok(entity).build())
-                .onItem().ifNull().continueWith(Response.ok().status(Response.Status.NOT_FOUND)::build));
-    }
+    @Transactional
+    public Response update(UUID id, Event eventToUpdate) {
+        Event event = service.updateOrInsert(eventToUpdate);
 
-    @DELETE
-    @Path("{id}")
-    public Uni<Response> delete(UUID id) {
-        return Panache
-                .withTransaction(() -> Event.deleteById(id))
-                .map(deleted -> deleted ? Response.ok().status(Response.Status.NO_CONTENT).build()
-                        : Response.ok().status(Response.Status.NOT_FOUND).build());
+        return Response.accepted(event)
+                .status(Response.Status.ACCEPTED)
+                .build();
     }
 
     @Provider

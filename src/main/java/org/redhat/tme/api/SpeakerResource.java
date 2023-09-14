@@ -2,10 +2,9 @@ package org.redhat.tme.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.quarkus.hibernate.reactive.panache.Panache;
 import io.smallrye.mutiny.CompositeException;
-import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -13,9 +12,10 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 import org.jboss.logging.Logger;
 
-import org.redhat.tme.entities.Session;
 import org.redhat.tme.entities.Speaker;
+import org.redhat.tme.services.SpeakersService;
 
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,45 +26,46 @@ public class SpeakerResource {
 
     private static final Logger LOGGER = Logger.getLogger(SpeakerResource.class.getName());
 
+    @Inject
+    SpeakersService service;
+
     @GET
-    public Uni<List<Speaker>> getSpeakers(@QueryParam("eventId") UUID eventId) {
-        return Speaker.find("#Speaker.findByEvent", eventId).list();
+    public Response getSpeakers(@QueryParam("eventId") UUID eventId) {
+        List<Speaker> speakers = service.getSpeakersForEvent(eventId);
+        return Response.ok(speakers)
+                .status(Response.Status.OK)
+                .build();
     }
 
     @GET
-    @Path("{id}")
-    public Uni<Speaker> getById(UUID id) {
-        return Speaker.findById(id);
+    @Path("{speakerId}")
+    public Response getSpeaker(@PathParam("speakerId") UUID speakerId) {
+        Speaker speaker = service.getSpeakerById(speakerId);
+
+        return Response.ok(speaker)
+                .status(Response.Status.OK)
+                .build();
     }
 
     @POST
-    public Uni<Response> create(Speaker newSpeaker) {
-        if (newSpeaker == null)
-            throw new WebApplicationException("Speaker payload is missing");
+    @Transactional
+    public Response newSpeaker(Speaker newSpeaker) {
+        Speaker speaker = service.updateOrInsert(newSpeaker);
 
-        return Panache
-                .withTransaction(newSpeaker::persist)
-                .replaceWith(Response.ok(newSpeaker).status(Response.Status.CREATED)::build);
+        return Response.created(URI.create("/speakers/" + speaker.getId()))
+                .status(Response.Status.CREATED)
+                .build();
     }
 
     @PUT
-    @Path("{id}")
-    public Uni<Response> update(UUID id, Speaker speaker) {
-        if (speaker == null)
-            throw new WebApplicationException("Speaker payload is missing");
-        return Panache
-                .withTransaction(() -> Speaker.<Speaker> findById(id)
-                        .onItem().ifNotNull().transform(entity -> Response.ok(entity).build())
-                        .onItem().ifNull().continueWith(Response.ok().status(Response.Status.NOT_FOUND)::build));
-    }
+    @Path("{speakerId}")
+    @Transactional
+    public Response updateSpeaker(@PathParam("speakerId") UUID speakerId, Speaker speakerToUpdate) {
+        Speaker speaker = service.updateOrInsert(speakerToUpdate);
 
-    @DELETE
-    @Path("{id}")
-    public Uni<Response> delete(UUID id) {
-        return Panache
-                .withTransaction(() -> Speaker.deleteById(id))
-                .map(deleted -> deleted ? Response.ok().status(Response.Status.NO_CONTENT).build()
-                        : Response.ok().status(Response.Status.NOT_FOUND).build());
+        return Response.accepted(speaker)
+                .status(Response.Status.ACCEPTED)
+                .build();
     }
 
     @Provider

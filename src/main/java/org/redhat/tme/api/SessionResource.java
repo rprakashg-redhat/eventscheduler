@@ -2,10 +2,9 @@ package org.redhat.tme.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.quarkus.hibernate.reactive.panache.Panache;
 import io.smallrye.mutiny.CompositeException;
-import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -13,7 +12,9 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 import org.jboss.logging.Logger;
 import org.redhat.tme.entities.Session;
+import org.redhat.tme.services.SessionsService;
 
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,46 +25,46 @@ public class SessionResource {
 
     private static final Logger LOGGER = Logger.getLogger(SessionResource.class.getName());
 
+    @Inject
+    SessionsService service;
+
     @GET
-    public Uni<List<Session>> getSessionsForEvent(@QueryParam("eventId") UUID eventId){
-        return Session.find("event", eventId).list();
+    public Response getSessions(@QueryParam("eventId") UUID eventId) {
+        List<Session> sessions = service.getSessionsForEvent(eventId);
+        return Response.ok(sessions)
+                .status(Response.Status.OK)
+                .build();
     }
 
     @GET
-    @Path("{id}")
-    public Uni<Session> getById(UUID id) {
-        return Session.findById(id);
+    @Path("/{sessionId}")
+    public Response getSession(@PathParam("sessionId") UUID sessionId, @QueryParam("eventId") UUID eventId) {
+        Session session = service.getSessionById(sessionId);
+
+        return Response.ok(session)
+                .status(Response.Status.OK)
+                .build();
     }
 
     @POST
-    public Uni<Response> create(Session newSession) {
-        if (newSession == null)
-            throw new WebApplicationException("Session payload is required");
+    @Transactional
+    public Response newSession(Session newSession) {
+        Session session = service.updateOrInsert(newSession);
 
-        return Panache
-                .withTransaction(newSession::persist)
-                .replaceWith(Response.ok(newSession).status(Response.Status.CREATED)::build);
+        return Response.created(URI.create( "/sessions/" + session.getId()))
+                .status(Response.Status.CREATED)
+                .build();
     }
 
     @PUT
-    @Path("{id}")
-    public Uni<Response> update(UUID id, Session session) {
-        if (session == null)
-            throw new WebApplicationException("Session payload is required to update");
+    @Path("/{sessionId}")
+    @Transactional
+    public Response updateSession(@PathParam("sessionId") UUID sessionId, Session sessionToUpdate) {
+        Session session = service.updateOrInsert(sessionToUpdate);
 
-        return Panache
-                .withTransaction(() -> Session.<Session> findById(id)
-                .onItem().ifNotNull().transform(entity -> Response.ok(entity).build())
-                .onItem().ifNull().continueWith(Response.ok().status(Response.Status.NOT_FOUND)::build));
-    }
-
-    @DELETE
-    @Path("{id}")
-    public Uni<Response> delete(UUID id) {
-        return Panache
-                .withTransaction(() -> Session.deleteById(id))
-                .map(deleted -> deleted ? Response.ok().status(Response.Status.NO_CONTENT).build()
-                        : Response.ok().status(Response.Status.NOT_FOUND).build());
+        return Response.accepted(session)
+                .status(Response.Status.ACCEPTED)
+                .build();
     }
 
     @Provider
